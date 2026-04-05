@@ -1,49 +1,47 @@
 import { EditorCore } from "@/core";
+import {
+	resolveAnimationTarget,
+	updateScalarKeyframeCurve,
+} from "@/lib/animation";
 import { Command, type CommandResult } from "@/lib/commands/base-command";
-import { resolveAnimationTarget, upsertPathKeyframe } from "@/lib/animation";
 import { updateElementInTracks } from "@/lib/timeline";
-import type { TimelineTrack } from "@/lib/timeline";
 import type {
 	AnimationPath,
-	AnimationInterpolation,
-	AnimationValue,
+	ScalarCurveKeyframePatch,
 } from "@/lib/animation/types";
+import type { TimelineTrack } from "@/lib/timeline";
 
-export class UpsertKeyframeCommand extends Command {
+export class UpdateScalarKeyframeCurveCommand extends Command {
 	private savedState: TimelineTrack[] | null = null;
 	private readonly trackId: string;
 	private readonly elementId: string;
 	private readonly propertyPath: AnimationPath;
-	private readonly time: number;
-	private readonly value: AnimationValue;
-	private readonly interpolation: AnimationInterpolation | undefined;
-	private readonly keyframeId: string | undefined;
+	private readonly componentKey: string;
+	private readonly keyframeId: string;
+	private readonly patch: ScalarCurveKeyframePatch;
 
 	constructor({
 		trackId,
 		elementId,
 		propertyPath,
-		time,
-		value,
-		interpolation,
+		componentKey,
 		keyframeId,
+		patch,
 	}: {
 		trackId: string;
 		elementId: string;
 		propertyPath: AnimationPath;
-		time: number;
-		value: AnimationValue;
-		interpolation?: AnimationInterpolation;
-		keyframeId?: string;
+		componentKey: string;
+		keyframeId: string;
+		patch: ScalarCurveKeyframePatch;
 	}) {
 		super();
 		this.trackId = trackId;
 		this.elementId = elementId;
 		this.propertyPath = propertyPath;
-		this.time = time;
-		this.value = value;
-		this.interpolation = interpolation;
+		this.componentKey = componentKey;
 		this.keyframeId = keyframeId;
+		this.patch = patch;
 	}
 
 	execute(): CommandResult | undefined {
@@ -55,27 +53,18 @@ export class UpsertKeyframeCommand extends Command {
 			trackId: this.trackId,
 			elementId: this.elementId,
 			update: (element) => {
-				const target = resolveAnimationTarget({
-					element,
-					path: this.propertyPath,
-				});
-				if (!target) {
+				if (!resolveAnimationTarget({ element, path: this.propertyPath })) {
 					return element;
 				}
 
-				const boundedTime = Math.max(0, Math.min(this.time, element.duration));
 				return {
 					...element,
-					animations: upsertPathKeyframe({
+					animations: updateScalarKeyframeCurve({
 						animations: element.animations,
 						propertyPath: this.propertyPath,
-						time: boundedTime,
-						value: this.value,
-						interpolation: this.interpolation,
+						componentKey: this.componentKey,
 						keyframeId: this.keyframeId,
-						kind: target.kind,
-						defaultInterpolation: target.defaultInterpolation,
-						coerceValue: target.coerceValue,
+						patch: this.patch,
 					}),
 				};
 			},
